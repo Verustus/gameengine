@@ -1,0 +1,16 @@
+[package]
+name = "gameengine"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+glium = "0.34.0"
+winit = "0.29"
+image = "0.24.7"
+ndarray = "0.15.6"
+raw-window-handle = "0.5.0"
+glutin-winit = "0.4"
+
+[build-dependencies]
+spirv-compiler = "0.2.0"
+inline-spirv = "0.1.6"
