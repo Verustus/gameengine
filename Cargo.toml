@@ -13,4 +13,3 @@ glutin-winit = "0.4"
 
 [build-dependencies]
 spirv-compiler = "0.2.0"
-inline-spirv = "0.1.6"

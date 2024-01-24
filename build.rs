@@ -1,5 +1,4 @@
 use std::{fs::{read_dir, File, DirEntry}, io::Write};
-use inline_spirv::include_spirv;
 use spirv_compiler::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -7,8 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for path in read_dir("shaders").unwrap() {
         let shader: DirEntry = path.unwrap();
         if shader.metadata().unwrap().is_file() {
-            //let compiled_data: Vec<u32> = compiler.compile_from_string(std::fs::read_to_string(shader.path()).unwrap().as_str(), get_shader_kind(shader.file_name().to_str().unwrap()).unwrap()).unwrap();
-            let compiled_data = include_spirv!(shader.path(), vert, glsl, entry="main");
+            let compiled_data: Vec<u32> = compiler.compile_from_string(std::fs::read_to_string(shader.path()).unwrap().as_str(), get_shader_kind(shader.file_name().to_str().unwrap()).unwrap()).unwrap();
             let mut compiled_shader = File::create("shaderCache/".to_owned()+shader.file_name().as_os_str().to_str().unwrap()+".spv").unwrap();
             for &value in &compiled_data {
                 compiled_shader.write_all(&value.to_ne_bytes()).unwrap();
