@@ -2,7 +2,12 @@ use std::{fs::{read_dir, File, DirEntry}, io::Write};
 use spirv_compiler::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut compiler = CompilerBuilder::new().with_include_dir("shaders/include").with_source_language(SourceLanguage::GLSL).with_target_spirv(SpirvVersion::V1_6).build().unwrap();
+    let mut compiler = CompilerBuilder::new()
+        .with_auto_bind_uniforms(true).with_include_dir("shaders/include")
+        .with_source_language(SourceLanguage::GLSL)
+        .with_target_spirv(SpirvVersion::V1_6)
+        .build().unwrap();
+
     for path in read_dir("shaders").unwrap() {
         let shader: DirEntry = path.unwrap();
         if shader.metadata().unwrap().is_file() {

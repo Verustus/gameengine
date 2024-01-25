@@ -1,5 +1,5 @@
 use glium::{Surface, glutin::{self, surface::WindowSurface, context::Version}};
-use std::{borrow::Cow, num::NonZeroU32, time::Instant};
+use std::{num::NonZeroU32, time::Instant};
 use crate::graphics::types::{RenderVertex, Rotate};
 use raw_window_handle::HasRawWindowHandle;
 use crate::glium::glutin::prelude::*;
@@ -97,14 +97,14 @@ pub fn start() {
     let material2 = glium::uniforms::UniformBuffer::new(&display, Material { color_override: [1f32, 0f32, 0f32] }).unwrap();
     let material3 = glium::uniforms::UniformBuffer::new(&display, Material { color_override: [-2f32, 0f32, 0f32] }).unwrap();
 
-    //const U32_NORMALS: [u16; 6] = [0, 1, 2, 0, 3, 2];
-    //let normals = glium::VertexBuffer::new(&display, U32_NORMALS).unwrap();
+    //let normals = glium::VertexBuffer::new(&display, NORMALS).unwrap();
     
     let vertex_shader_binary = std::fs::read(inner_path!("shaderCache/simple.vs.spv")).unwrap();
     let vertex_shader = glium::program::SpirvEntryPoint { binary: vertex_shader_binary.as_slice(), entry_point: "main" };
     let fragment_shader_binary = std::fs::read(inner_path!("shaderCache/simple.fs.spv")).unwrap();
     let fragment_shader = glium::program::SpirvEntryPoint { binary: fragment_shader_binary.as_slice(), entry_point: "main" };
     let spirv_program = glium::program::SpirvProgram::from_vs_and_fs(vertex_shader, fragment_shader);
+
     let program = glium::Program::new(&display, glium::program::ProgramCreationInput::SpirV(spirv_program)).unwrap();
     /*
     let vertex_shader = std::fs::read_to_string(inner_path!("shaders/simple.vs")).unwrap();
@@ -127,31 +127,9 @@ pub fn start() {
                     shape2.rotate([0.0, rotation, 0.0].into(), [0.0, 0.0, 0.0].into());
                     shape3.rotate([rotation, 0.0, 0.0].into(), get_position(&shape3).into());
 
-                    static BINDINGS: glium::vertex::VertexFormat = &[
-                        (
-                            Cow::Borrowed("position"), 0, 0,
-                            glium::vertex::AttributeType::F32F32F32, false
-                        ),
-                        (
-                            Cow::Borrowed("texture_coords"), 3 * ::std::mem::size_of::<f32>(), 1,
-                            glium::vertex::AttributeType::F32F32, false
-                        ),
-                    ];
                     let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
                     let vertex_buffer2 = glium::VertexBuffer::new(&display, &shape2).unwrap();
                     let vertex_buffer3 = glium::VertexBuffer::new(&display, &shape3).unwrap();
-                    /*let vertex_buffer = unsafe {
-                        glium::VertexBuffer::new_raw(&display, &shape,
-                        BINDINGS, 5 * ::std::mem::size_of::<f32>()).unwrap()
-                    };
-                    let vertex_buffer2 = unsafe {
-                        glium::VertexBuffer::new_raw(&display, &shape2,
-                        BINDINGS, 5 * ::std::mem::size_of::<f32>()).unwrap()
-                    };
-                    let vertex_buffer3 = unsafe {
-                        glium::VertexBuffer::new_raw(&display, &shape3,
-                        BINDINGS, 5 * ::std::mem::size_of::<f32>()).unwrap()
-                    };*/
 
                     let uniforms = uniform! {
                         texture_2d: &texture,
@@ -185,8 +163,6 @@ pub fn start() {
                     let _ = frame.draw(&vertex_buffer2, &indices, &program, &uniforms_2, &params);
                     let _ = frame.draw(&vertex_buffer3, &indices, &program, &uniforms_3, &params);
                     frame.finish().unwrap();
-
-                    glium::assert_no_gl_error!(display);
                 },
                 _ => ()
             }

@@ -1,12 +1,12 @@
-#version 460
-
-layout(binding = 0) uniform sampler2D texture_2d;
-layout(binding = 1) uniform Material {
-    vec3 color_override;
-};
+#version 430
 
 layout(location = 2) in vec2 vertex_texture_coords;
 layout(location = 0) out vec4 color;
+
+uniform sampler2D texture_2d;
+uniform Material {
+    vec3 color_override;
+};
 
 void main() {
     vec4 texture_color = texture(texture_2d, vertex_texture_coords);
