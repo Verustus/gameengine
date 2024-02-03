@@ -5,6 +5,7 @@ layout(location = 1) in vec2 texture_coords;
 //layout(location = 2) in vec3 normal;
 
 layout(location = 2) out vec2 vertex_texture_coords;
+
 /*layout(location = 1) out vec3 v_normal;
 
 layout(set = 0, binding = 1) uniform Camera {

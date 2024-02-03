@@ -106,6 +106,7 @@ pub struct RenderVertex {
     pub position: [f32; 3],
     pub texture_coords: [f32; 2]
 }
+
 impl From<Vertex> for RenderVertex {
     fn from(mut src: Vertex) -> RenderVertex {
         RenderVertex {
