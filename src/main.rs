@@ -11,5 +11,5 @@ pub mod graphics;
 
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "full");
-    graphics::opengl::window::start();
+    graphics::window::Window::new(None);
 }

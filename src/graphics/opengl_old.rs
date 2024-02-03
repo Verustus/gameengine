@@ -1,6 +1,6 @@
 use std::time::Instant;
 use glium::Surface;
-use crate::graphics::{types::{RenderVertex, Rotate}, window::{Window, WindowType}};
+use crate::graphics::{types::{RenderVertex, Rotate}, window::{Window, WindowMode}};
 
 implement_vertex!(RenderVertex, position, texture_coords);
 
@@ -22,7 +22,7 @@ fn get_position(vertices: &[RenderVertex]) -> [f32; 3] {
 }
 
 pub fn start() {
-    let window: Window = Window::new(Some("Test"), Some(WindowType::Fullscreen), None);
+    let window: Window = Window::new(Some("Test"), Some(WindowMode::Borderless([400, 400])), None);
     let (display, window, event_loop) = (window.display, window.window, window.event_loop);
 
     let image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>> = image::load(std::io::Cursor::new(std::fs::read(inner_path!("img/opengl_logo.png")).unwrap()), image::ImageFormat::Png).unwrap().to_rgba8();

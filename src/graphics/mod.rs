@@ -1,4 +1,5 @@
-pub mod opengl { pub mod window; }
+pub mod opengl;
+pub mod vulkan;
 pub mod shaders {
     pub mod shader;
 }

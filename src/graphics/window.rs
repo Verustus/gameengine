@@ -1,8 +1,10 @@
-use std::{num::NonZeroU32, rc::Rc};
-use raw_window_handle::HasRawWindowHandle;
-use glium::glutin::{self, context::NotCurrentGlContext, display::GlDisplay};
-use glutin::display::GetGlDisplay;
+use std::rc::Rc;
+use glium::glutin;
 use winit::{event_loop::EventLoop, monitor::VideoMode, window::Fullscreen};
+
+use crate::graphics::vulkan::VulkanWindowBuilder;
+
+use super::{opengl::{OpenglWindow, OpenglWindowBuilder}, vulkan::VulkanWindow};
 
 pub enum WindowMode {
     WindowedFullscreen,
@@ -11,16 +13,10 @@ pub enum WindowMode {
     Borderless([u32; 2])
 }
 
-pub enum WindowRender {
-    OpenGL(u32, u32),
+#[derive(Copy, Clone)]
+pub enum Version {
+    OpenGL(u8, u8),
     Vulkan(u32, u32, u32)
-}
-
-pub enum WindowConfig {
-    Resizable(ResizeType),
-    Movable(WindowMove),
-    Resolution([f32; 2]),
-    Version()
 }
 
 pub enum ResizeSide {
@@ -39,10 +35,43 @@ pub enum ResizeType {
 }
 
 pub enum WindowMove {
-    OuterMargin([u32; 4]),
-    InnerMargin([u32; 4]),
+    CenterBox([u32; 2]), /// width and height
+    Box([u32; 2], [u32; 2]), /// position x and y, width and height
+    SideMargin([u32; 4]), ///  left, right, top, bottom
     Full,
     None
+}
+
+struct WindowConfig {
+    title: String,
+    window_mode: WindowMode,
+    resizable: ResizeType,
+    movable: WindowMove,
+    resolution: [u32; 2],
+    version: Version
+}
+
+impl Default for WindowConfig {
+    fn default() -> WindowConfig {
+        return WindowConfig {
+            title: "New Window".to_string(),
+            window_mode: WindowMode::Normal([500, 600]),
+            resizable: ResizeType::All,
+            movable: WindowMove::SideMargin([0, 0, 0, 50]),
+            resolution: [1920, 1080],
+            version: Version::OpenGL(4, 6)
+        };
+    }
+}
+
+pub trait WindowBuilder {
+    fn build<T>(&mut self, event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, glium::Display<glutin::surface::WindowSurface>);
+    fn get_winit(&self) -> winit::window::WindowBuilder;
+    fn set_winit(&self, winit_builder: winit::window::WindowBuilder);
+}
+
+pub trait AnyWindow {
+    fn start(&self);
 }
 
 pub struct Window {
@@ -52,50 +81,95 @@ pub struct Window {
     pub event_loop: EventLoop<()>
 }
 
-pub trait SimpleWindow {
-    fn create_window();
-    fn run();
+enum AnyWindowBuilder {
+    OpenGL(OpenglWindowBuilder),
+    Vulkan(VulkanWindowBuilder)
+}
+
+impl WindowBuilder for AnyWindowBuilder {
+    fn build<T>(&mut self, event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, glium::Display<glutin::surface::WindowSurface>) {
+        match self {
+            AnyWindowBuilder::OpenGL(window_builder) => window_builder.build(event_loop),
+            AnyWindowBuilder::Vulkan(window_builder) => window_builder.build(event_loop)
+        }
+    }
+
+    fn get_winit(&self) -> winit::window::WindowBuilder {
+        match self {
+            AnyWindowBuilder::OpenGL(window_builder) => window_builder.get_winit(),
+            AnyWindowBuilder::Vulkan(window_builder) => window_builder.get_winit()
+        }
+    }
+
+    fn set_winit(&self, winit_builder: winit::window::WindowBuilder) {
+        match self {
+            AnyWindowBuilder::OpenGL(window_builder) => window_builder.set_winit(winit_builder),
+            AnyWindowBuilder::Vulkan(window_builder) => window_builder.set_winit(winit_builder)
+        }
+    }
+}
+
+
+fn create_window_builder(version: Version) -> AnyWindowBuilder {
+    match version {
+        Version::OpenGL(major, minor) => AnyWindowBuilder::OpenGL(OpenglWindowBuilder {
+            winit_builder: winit::window::WindowBuilder::new(),
+            version: [major, minor]
+        }),
+        Version::Vulkan(major, minor, patch) => AnyWindowBuilder::Vulkan(VulkanWindowBuilder {
+            winit_builder: winit::window::WindowBuilder::new(),
+            version: [major, minor, patch]
+        })
+    }
 }
 
 impl Window {
-    pub fn new(title: Option<&str>, window_mode: Option<WindowMode>, config: Option<Vec<WindowConfig>>) -> Window {
+    pub fn new(config: Option<WindowConfig>) -> Box<dyn AnyWindow> {
         let event_loop = winit::event_loop::EventLoopBuilder::new().build().unwrap();
-        let mut window_builder = winit::window::WindowBuilder::new();
-        window_builder = window_builder
-            .with_title(title.map_or_else(|| "New window", |title| title));
+        let config = config.unwrap_or_default();
+
+        let builder: AnyWindowBuilder = create_window_builder(config.version);
+
+        let mut winit_builder = builder.get_winit();
+        winit_builder = winit_builder.with_title(config.title);
         let (window, display);
 
-        let window_mode = window_mode.unwrap_or(WindowMode::Fullscreen);
-        
-        match window_mode {
+        match config.window_mode {
             WindowMode::Fullscreen => {
-                (window, display) = window_builder.simple_build(&event_loop);
+                (window, display) = builder.build(&event_loop);
                 let size = [window.current_monitor().unwrap().size().width,
                                       window.current_monitor().unwrap().size().height];
                 window.set_fullscreen(
                     Some(Fullscreen::Exclusive(Self::get_video_mode(&window, size))));
             },
             WindowMode::WindowedFullscreen => {
-                (window, display) = window_builder.simple_build(&event_loop);
+                (window, display) = builder.build(&event_loop);
                 window.set_fullscreen(Some(Fullscreen::Borderless(None)));
             },
             WindowMode::Normal(size) => {
-                (window, display) = window_builder.with_inner_size_simple(size[0], size[1])
-                                                  .simple_build(&event_loop);
+                builder.set_winit(winit_builder.with_inner_size(winit::dpi::PhysicalSize::new(size[0], size[1])));
+                (window, display) = builder.build(&event_loop);
             },
             WindowMode::Borderless(size) => {
-                (window, display) = window_builder.with_inner_size_simple(size[0], size[1])
-                                                  .with_transparent(true).with_decorations(false)
-                                                  .simple_build(&event_loop);
+                builder.set_winit(winit_builder.with_transparent(true)
+                                                              .with_inner_size(winit::dpi::PhysicalSize::new(size[0], size[1]))
+                                                              .with_decorations(false)
+                                                              .with_resizable(true));
+                (window, display) = builder.build(&event_loop);
             }
         }
 
-        return Window {
-            window_mode: window_mode,
+        let window = Window {
+            window_mode: config.window_mode,
             window: window,
             display: display,
             event_loop: event_loop
         };
+
+        match config.version {
+            Version::OpenGL(_, _) => return  Box::new(OpenglWindow { window: window }),
+            Version::Vulkan(_, _, _) => return Box::new(VulkanWindow { window: window }),
+        }
     }
 
     fn get_video_mode(window: &winit::window::Window, size: [u32; 2]) -> VideoMode {
@@ -121,57 +195,6 @@ impl Window {
             }
         }
 
-        println!("selected: {}, {}", closest.size().width, closest.size().height);
         return closest;
-    }
-}
-
-pub trait SimpleWindowBuilder {
-    fn simple_build<T>(self, event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, glium::Display<glutin::surface::WindowSurface>);
-    fn with_inner_size_simple(self, width: u32, height: u32) -> Self;
-    fn with_title_simple(self, title: &str) -> Self;
-}
-
-impl SimpleWindowBuilder for winit::window::WindowBuilder {
-    fn simple_build<T>(self, event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, glium::Display<glutin::surface::WindowSurface>) {
-        let display_builder = glutin_winit::DisplayBuilder::new().with_window_builder(Some(self));
-        let config_template_builder = glutin::config::ConfigTemplateBuilder::new();
-        let (window, gl_config) = display_builder
-            .build(&event_loop, config_template_builder, |mut configs| {
-                configs.next().unwrap()
-            })
-            .unwrap();
-        let window = window.unwrap();
-
-        // Now we get the window size to use as the initial size of the Surface
-        let (width, height): (u32, u32) = window.inner_size().into();
-        let attrs = glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new().build(
-            window.raw_window_handle(),
-            NonZeroU32::new(width).unwrap(),
-            NonZeroU32::new(height).unwrap(),
-        );
-
-        let surface = unsafe { gl_config.display().create_window_surface(&gl_config, &attrs).unwrap() };
-        let context_attributes = glutin::context::ContextAttributesBuilder::new()
-            .with_context_api(glutin::context::ContextApi::OpenGl(
-                Some(glutin::context::Version::new(4, 6))
-            ))
-            .build(Some(window.raw_window_handle()));
-        let current_context = Some(unsafe {
-            gl_config.display().create_context(&gl_config, &context_attributes).expect("failed to create context")
-        }).unwrap().make_current(&surface).unwrap();
-        let display = glium::Display::from_context_surface(current_context, surface).unwrap();
-
-        return (window, display);
-    }
-
-    fn with_inner_size_simple(mut self, width: u32, height: u32) -> Self {
-        self = self.with_inner_size(winit::dpi::PhysicalSize::new(width, height));
-        return self;
-    }
-
-    fn with_title_simple(mut self, title: &str) -> Self {
-        self = self.with_title(title);
-        return self;
     }
 }
