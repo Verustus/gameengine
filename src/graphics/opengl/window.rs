@@ -1,5 +1,4 @@
 use std::time::Instant;
-
 use glium::Surface;
 use crate::graphics::{types::{RenderVertex, Rotate}, window::{Window, WindowType}};
 
@@ -122,8 +121,6 @@ pub fn start() {
                     let _ = frame.draw(&vertex_buffer2, &indices, &program, &uniforms_2, &params);
                     let _ = frame.draw(&vertex_buffer3, &indices, &program, &uniforms_3, &params);
                     frame.finish().unwrap();
-
-                    glium::assert_no_gl_error!(display);
                 },
                 _ => ()
             }
