@@ -42,7 +42,7 @@ impl WindowBuilder for VulkanWindowBuilder {
         return (window, display);
     }
 
-    fn get_winit(&self) -> &winit::window::WindowBuilder { return &self.winit_builder; }
+    fn get_winit(&self) -> winit::window::WindowBuilder { return self.winit_builder; }
 
     fn set_winit(&mut self, winit_builder: winit::window::WindowBuilder) { self.winit_builder = winit_builder; }
 }

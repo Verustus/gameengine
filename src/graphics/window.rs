@@ -67,18 +67,18 @@ impl Default for WindowConfig {
 pub trait WindowBuilder {
     fn build<T>(&mut self, event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, glium::Display<glutin::surface::WindowSurface>);
     fn get_winit(&self) -> winit::window::WindowBuilder;
-    fn set_winit(&self, winit_builder: winit::window::WindowBuilder);
+    fn set_winit(&mut self, winit_builder: winit::window::WindowBuilder);
 }
 
 pub trait AnyWindow {
     fn start(&self);
+    fn render(&self);
 }
 
 pub struct Window {
     pub window_mode: WindowMode,
-    pub window: winit::window::Window,
-    pub display: glium::backend::glutin::Display<glutin::surface::WindowSurface>,
-    pub event_loop: EventLoop<()>
+    pub winit_window: Rc<winit::window::Window>,
+    pub display: glium::backend::glutin::Display<glutin::surface::WindowSurface>
 }
 
 enum AnyWindowBuilder {
@@ -86,7 +86,7 @@ enum AnyWindowBuilder {
     Vulkan(VulkanWindowBuilder)
 }
 
-impl WindowBuilder for AnyWindowBuilder {
+impl AnyWindowBuilder {
     fn build<T>(&mut self, event_loop: &winit::event_loop::EventLoop<T>) -> (winit::window::Window, glium::Display<glutin::surface::WindowSurface>) {
         match self {
             AnyWindowBuilder::OpenGL(window_builder) => window_builder.build(event_loop),
@@ -101,7 +101,7 @@ impl WindowBuilder for AnyWindowBuilder {
         }
     }
 
-    fn set_winit(&self, winit_builder: winit::window::WindowBuilder) {
+    fn set_winit(&mut self, winit_builder: winit::window::WindowBuilder) {
         match self {
             AnyWindowBuilder::OpenGL(window_builder) => window_builder.set_winit(winit_builder),
             AnyWindowBuilder::Vulkan(window_builder) => window_builder.set_winit(winit_builder)
@@ -128,48 +128,70 @@ impl Window {
         let event_loop = winit::event_loop::EventLoopBuilder::new().build().unwrap();
         let config = config.unwrap_or_default();
 
-        let builder: AnyWindowBuilder = create_window_builder(config.version);
+        let mut builder: AnyWindowBuilder = create_window_builder(config.version);
 
         let mut winit_builder = builder.get_winit();
         winit_builder = winit_builder.with_title(config.title);
-        let (window, display);
+        let (winit_window, display);
 
         match config.window_mode {
             WindowMode::Fullscreen => {
-                (window, display) = builder.build(&event_loop);
-                let size = [window.current_monitor().unwrap().size().width,
-                                      window.current_monitor().unwrap().size().height];
-                window.set_fullscreen(
-                    Some(Fullscreen::Exclusive(Self::get_video_mode(&window, size))));
+                (winit_window, display) = builder.build(&event_loop);
+                let size = [winit_window.current_monitor().unwrap().size().width,
+                winit_window.current_monitor().unwrap().size().height];
+                winit_window.set_fullscreen(
+                    Some(Fullscreen::Exclusive(Self::get_video_mode(&winit_window, size))));
             },
             WindowMode::WindowedFullscreen => {
-                (window, display) = builder.build(&event_loop);
-                window.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                (winit_window, display) = builder.build(&event_loop);
+                winit_window.set_fullscreen(Some(Fullscreen::Borderless(None)));
             },
             WindowMode::Normal(size) => {
                 builder.set_winit(winit_builder.with_inner_size(winit::dpi::PhysicalSize::new(size[0], size[1])));
-                (window, display) = builder.build(&event_loop);
+                (winit_window, display) = builder.build(&event_loop);
             },
             WindowMode::Borderless(size) => {
                 builder.set_winit(winit_builder.with_transparent(true)
                                                               .with_inner_size(winit::dpi::PhysicalSize::new(size[0], size[1]))
                                                               .with_decorations(false)
                                                               .with_resizable(true));
-                (window, display) = builder.build(&event_loop);
+                (winit_window, display) = builder.build(&event_loop);
             }
         }
 
         let window = Window {
             window_mode: config.window_mode,
-            window: window,
-            display: display,
-            event_loop: event_loop
+            winit_window: Rc::new(winit_window),
+            display: display
         };
 
-        match config.version {
-            Version::OpenGL(_, _) => return  Box::new(OpenglWindow { window: window }),
-            Version::Vulkan(_, _, _) => return Box::new(VulkanWindow { window: window }),
-        }
+        let any_window: Box<dyn AnyWindow> = match config.version {
+            Version::OpenGL(_, _) => Box::new(OpenglWindow { window: window }),
+            Version::Vulkan(_, _, _) => Box::new(VulkanWindow { window: window })
+        };
+
+        event_loop.run(move |event, control_flow| {
+            match event {
+                winit::event::Event::AboutToWait => winit_window.request_redraw(),
+                winit::event::Event::WindowEvent { event, .. } => match event {
+                    winit::event::WindowEvent::CloseRequested => control_flow.exit(),
+                    winit::event::WindowEvent::Resized(window_size) => { display.resize(window_size.into()); },
+                    winit::event::WindowEvent::RedrawRequested => {
+                        any_window.render();
+                    },
+                    _ => ()
+                }
+                _ => ()
+            }
+        });
+
+        any_window.start();
+
+        return window;
+    }
+
+    fn event_loop() {
+
     }
 
     fn get_video_mode(window: &winit::window::Window, size: [u32; 2]) -> VideoMode {

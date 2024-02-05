@@ -64,18 +64,14 @@ impl WindowBuilder for OpenglWindowBuilder {
         return (window, display);
     }
 
-    fn get_winit(&self) -> &winit::window::WindowBuilder { return &self.winit_builder; }
+    fn get_winit(&self) -> winit::window::WindowBuilder { return self.winit_builder.clone(); }
 
     fn set_winit(&mut self, winit_builder: winit::window::WindowBuilder) { self.winit_builder = winit_builder; }
 }
 
-pub struct OpenglWindow {
-    pub window: Window
-}
-
-impl AnyWindow for OpenglWindow {
-    fn start(&self) {
-        let (display, window, event_loop) = (self.window.display.to_owned(), &self.window.window, &self.window.event_loop);
+impl AnyWindow {
+    fn start(&self, display, window: ) {
+        let (display, window) = (self.window.display.to_owned(), &self.);
 
         let image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>> = image::load(std::io::Cursor::new(std::fs::read(inner_path!("img/opengl_logo.png")).unwrap()), image::ImageFormat::Png).unwrap().to_rgba8();
         let image_dimensions = image.dimensions();
@@ -123,7 +119,8 @@ impl AnyWindow for OpenglWindow {
         let program = glium::Program::from_source(&display, vertex_shader.as_str(), fragment_shader.as_str(), None).unwrap();
         
         let mut last_frame_update = Instant::now();
-        let _ = event_loop.run(move |event, control_flow| {
+
+        let _ = &self.window.event_loop.run(move |event, control_flow| {
             match event {
                 winit::event::Event::AboutToWait => window.request_redraw(),
                 winit::event::Event::WindowEvent { event, .. } => match event {
